@@ -1,4 +1,4 @@
-function tmp = mmc_read_serial(tmp)
+function tmp = mmc_read_serial_pl(tmp)
 %
 %
     

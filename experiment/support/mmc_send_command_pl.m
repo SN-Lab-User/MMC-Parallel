@@ -1,10 +1,10 @@
-function mmc_send_command(display, command, param)
+function mmc_send_command_pl(display, command, param)
 
 if nargin<3
     param = [];
 end
 if ischar(param)
-    param = mmc_common_patterns(param);
+    param = mmc_common_patterns_pl(param);
 end
 
 switch command

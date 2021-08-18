@@ -1,12 +1,14 @@
-function [controller, display1, display2, display3, display4] = mmc_connect()
+function [controller, display1, display2, display3, display4] = mmc_connect_pl(splist)
 % FUNCTION [controller, display1, display2] = mmc_connect()
 %
 % Establish serial connections to the 5 arduino microcontrollers
 % (controller, displays) and outputs the serial objects.
 % Delete the serial object variables to disconnect.
 
-%get list of all available serial ports
-splist = serialportlist("available");
+%get list of all available serial ports (if none provided)
+if nargin==0
+    splist = serialportlist("available");
+end
 
 %for every available serial port, query for version #
 for i = 1:length(splist)
@@ -15,16 +17,16 @@ for i = 1:length(splist)
     pause(2);
     
     %send version query to serial object
-    mmc_send_command(tmp, 'Get-version')
+    mmc_send_command_pl(tmp, 'Get-version')
     pause(0.5);
-    tmp = mmc_read_serial(tmp); %read and parse incoming serial data
+    tmp = mmc_read_serial_pl(tmp); %read and parse incoming serial data
         
     %get timestamp for program start
-    mmc_send_command(tmp, 'Get-timestamp')
+    mmc_send_command_pl(tmp, 'Get-timestamp')
     while (tmp.serial.NumBytesAvailable<1)
         pause(0.01);
     end
-    tmp = mmc_read_serial(tmp);
+    tmp = mmc_read_serial_pl(tmp);
      
     if isfield(tmp,'program')
         switch tmp.program

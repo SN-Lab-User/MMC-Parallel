@@ -1,4 +1,21 @@
-global exp
+%load metadata
+expdir = fileparts(mfilename('fullpath'));
+basedir = fileparts(expdir);
+currentmetadata_filename = fullfile(basedir,'temp','current_metadata.mat');
+progress_filename = fullfile(basedir,'temp','setup1_progress.mat');
+load(currentmetadata_filename,'metadata');
+progress.string = ['Trial ' num2str(t) ' of ' num2str(num_trials)];
+progress.val = 100*t/num_trials;
+save_prog = 0;
+while save_prog==0
+    try
+        save(progress_filename,'progress');
+        save_prog = 1;
+    catch
+        pause(0.1)
+        save_prog = 1;
+    end
+end
 
 %set experiment parameters
 rewardPos = 3;
@@ -11,7 +28,7 @@ prereward_dur = 0.1;
 correctreward_dur = 0.1;
 
 %connect to setup
-[controller, display1, display2, display3, display4] = mmc_connect();
+[controller, display1, display2, display3, display4] = mmc_connect_pl(metadata.splist);
 
 %create data and metadata struct
 pretrial_start_times = nan(1,num_trials);
@@ -28,26 +45,33 @@ for t = 1:num_trials
     if exp.stop==0
         pretrial_start_times(t) = now; %log pre trial start timestamp
         
-        %calculate progress of the experiment and update GUI
-        progress_text = ['Trial ' num2str(t) ' of ' num2str(num_trials)];
-        app.ProgressTextLabel.Text = progress_text;
-        progress = 100*t/num_trials;
-        app.ph.XData = [0 progress progress 0]; 
-        drawnow %update graphics    
+        %calculate progress of the experiment and save to progress file
+        progress.string = ['Trial ' num2str(t) ' of ' num2str(num_trials)];
+        progress.val = 100*t/num_trials;
+        save_prog = 0;
+        while save_prog==0
+            try
+                save(progress_filename,'progress');
+                save_prog = 1;
+            catch
+                pause(0.1)
+                save_prog = 1;
+            end
+        end
 
         pretrialstarttime = clock;
 
         %send stimulus to display at start position
-        mmc_send_command(display1, 'Display-rectangle', 'middle rectangle');
+        mmc_send_command_pl(display1, 'Display-rectangle', 'middle rectangle');
 
         %read sensors indefinitely
         param.duration = 0; 
-        mmc_send_command(controller, 'Read-sensors', param);
+        mmc_send_command_pl(controller, 'Read-sensors', param);
 
         %check for pokes
         end_cond = 0;
         while end_cond==0
-            controller = mmc_read_serial(controller);
+            controller = mmc_read_serial_pl(controller);
             
             if length(controller.log)>current_log
                 for i = current_log+1:length(controller.log)
@@ -75,11 +99,11 @@ for t = 1:num_trials
         end
 
         %after port 1 poke: stop display and sensor reads; give reward
-        mmc_send_command(display1, 'Stop');
-        mmc_send_command(controller, 'Stop');
+        mmc_send_command_pl(display1, 'Stop');
+        mmc_send_command_pl(controller, 'Stop');
         if give_reward==1
             param.duration = prereward_dur; param.relay = 1; 
-            mmc_send_command(controller, 'Toggle-relay', param);
+            mmc_send_command_pl(controller, 'Toggle-relay', param);
         end
 
         trialstarttime = clock;
@@ -89,19 +113,19 @@ for t = 1:num_trials
         trial_start_times(t) = now; %log reward trial start timestamp
         
         %send stimulus to display at all possible reward position
-        mmc_send_command(display2, 'Display-rectangle', 'middle rectangle');
-        mmc_send_command(display3, 'Display-rectangle', 'middle rectangle');
-        mmc_send_command(display4, 'Display-rectangle', 'middle rectangle');
+        mmc_send_command_pl(display2, 'Display-rectangle', 'middle rectangle');
+        mmc_send_command_pl(display3, 'Display-rectangle', 'middle rectangle');
+        mmc_send_command_pl(display4, 'Display-rectangle', 'middle rectangle');
 
         %read sensors indefinitely
         param.duration = 0; 
-        mmc_send_command(controller, 'Read-sensors', param);
+        mmc_send_command_pl(controller, 'Read-sensors', param);
 
         %check for pokes or trial
         end_cond = 0;
         give_reward = 0;
         while end_cond==0
-            controller = mmc_read_serial(controller);
+            controller = mmc_read_serial_pl(controller);
 
             if length(controller.log)>current_log
                 for i = current_log+1:length(controller.log)
@@ -134,6 +158,7 @@ for t = 1:num_trials
             end
             if etime(clock,trialstarttime)>(trial_timeout*60)
                 end_cond = 1;
+                stop_trial = t;
             end
             if exp.stop==1
                 end_cond = 1;
@@ -143,25 +168,32 @@ for t = 1:num_trials
         end
             
         %after port correct poke or timeout: stop display and sensor reads; give reward
-        mmc_send_command(display2, 'Stop');
-        mmc_send_command(display3, 'Stop');
-        mmc_send_command(display4, 'Stop');
-        mmc_send_command(controller, 'Stop');
+        mmc_send_command_pl(display2, 'Stop');
+        mmc_send_command_pl(display3, 'Stop');
+        mmc_send_command_pl(display4, 'Stop');
+        mmc_send_command_pl(controller, 'Stop');
         if give_reward==1
             param.duration = correctreward_dur; param.relay = rewardPos; 
             mmc_send_command(controller, 'Toggle-relay', param);
         end
     else
-        mmc_send_command(display2, 'Stop');
-        mmc_send_command(display3, 'Stop');
-        mmc_send_command(display4, 'Stop');
-        mmc_send_command(controller, 'Stop');
+        mmc_send_command_pl(display2, 'Stop');
+        mmc_send_command_pl(display3, 'Stop');
+        mmc_send_command_pl(display4, 'Stop');
+        mmc_send_command_pl(controller, 'Stop');
         
-        progress_text = ['Experiment stopped at trial ' num2str(stop_trial)];
-        app.ProgressTextLabel.Text = progress_text;
-        progress = 100*stop_trial/num_trials;
-        app.ph.XData = [0 progress progress 0]; 
-        drawnow %update graphics    
+        progress.string = ['Experiment stopped at trial ' num2str(stop_trial)];
+        progress.val = 100*stop_trial/num_trials;
+        save_prog = 0;
+        while save_prog==0
+            try
+                save(progress_filename,'progress');
+                save_prog = 1;
+            catch
+                pause(0.1)
+                save_prog = 1;
+            end
+        end
     end
 end 
 
@@ -183,16 +215,21 @@ exp.first_choice_times = first_choice_times;
 exp.correct_choice_times = correct_choice_times;
 exp.incorrect_choice_times = incorrect_choice_times;
 
-save(exp.metadata.savedir,'exp');
+save(metadata.savedir,'exp');
 
 %calculate progress of the experiment and update GUI
 timestr = datestr(now,'HH:MM');
-progress_text = ['Experiment complete (' timestr ')'];
-app.ProgressTextLabel.Text = progress_text;
-progress = 100;
-app.ph.XData = [0 progress progress 0]; 
-drawnow %update graphics    
-app.StopSetup1Button.Enable = 'off';
-app.RunSetup1Button.Enable = 'on';
+progress.string = ['Experiment complete (' timestr ')'];
+progress.val = 100;
+save_prog = 0;
+while save_prog==0
+    try
+        save(progress_filename,'progress');
+        save_prog = 1;
+    catch
+        pause(0.1)
+        save_prog = 1;
+    end
+end
 
         
